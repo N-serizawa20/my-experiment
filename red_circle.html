@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>jsPsych Red Circle Task</title>
+    <!-- jsPsych Core (v7) -->
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
+    
+    <!-- Plugins -->
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+
+    <style>
+        /* 背景色を灰色に設定 */
+        body {
+            background-color: #808080;
+            color: white;
+            margin: 0;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+
+        /* 赤い円の定義 */
+        .red-circle {
+            width: 100px;
+            height: 100px;
+            background-color: #ff0000;
+            border-radius: 50%;
+            margin: 0 auto;
+        }
+
+        /* jsPsychのデフォルト背景を無効化してbodyの色を活かす */
+        .jspsych-display-element {
+            background-color: transparent !important;
+        }
+    </style>
+</head>
+<body>
+    <div id="jspsych-target"></div>
+
+    <script>
+        const jsPsych = initJsPsych({
+            display_element: 'jspsych-target',
+            on_finish: function() {
+                // 必要に応じてデータを確認
+                // jsPsych.data.displayData();
+            }
+        });
+
+        // 1. 赤い円を表示する試行
+        const circle_trial = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+                <div class="red-circle"></div>
+                <p style="margin-top: 20px; font-size: 1.2rem;">スペースキーを押してください</p>
+            `,
+            choices: [' '], // スペースキーのみ受け付ける
+            data: { task: 'red_circle_display' }
+        };
+
+        // 2. 終了メッセージを表示する試行
+        const end_trial = {
+            type: jsPsychHtmlKeyboardResponse,
+            stimulus: `
+                <div style="font-size: 1.5rem;">
+                    <h1>終了しました</h1>
+                    <p>ご協力ありがとうございました。</p>
+                </div>
+            `,
+            choices: "NO_KEYS", // キー入力を受け付けない（または一定時間で終了させることも可能）
+            trial_duration: 3000 // 3秒後に自動終了（デモ用）
+        };
+
+        // タイムラインの構築
+        const timeline = [circle_trial, end_trial];
+
+        // 実行
+        jsPsych.run(timeline);
+    </script>
+</body>
+</html>
