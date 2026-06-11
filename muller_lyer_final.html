@@ -17,7 +17,7 @@
       margin: 0;
       padding: 0;
       width: 100%;
-      height: 100%;
+      min-height: 100%; /* height: 100% から変更してスクロール時の下切れを防止 */
       /* 芝生のライトグリーンと、うっすら浮かび上がる三角形パターンをCSSで再現 */
       background-color: #8cd47e;
       background-image: 
@@ -31,27 +31,28 @@
       font-family: 'Hiragino Maru Gothic ProN', 'Kosugi Maru', 'Meiryo', sans-serif;
       display: flex;
       justify-content: center;
-      align-items: center;
+      align-items: flex-start; /* 上切れバグを防ぐため、一番外側は上部開始にします */
       -webkit-tap-highlight-color: transparent;
       overflow-x: hidden;
       overflow-y: auto; /* 縦スクロールを有効化 */
+      scroll-behavior: smooth;
     }
     
     .jspsych-display-element {
       display: flex;
       flex-direction: column;
-      justify-content: center;
+      justify-content: flex-start; /* center から flex-start に変更し、縦幅が狭い場合の上切れバグを完全解消 */
       align-items: center;
       width: 100%;
-      min-height: 100%; /* height: 100% から min-height に変更し、小さい画面での見切れを防ぎます */
-      padding: 60px 0 40px 0; /* アバターが隠れないよう、上部パディングを設定 */
+      min-height: 100vh; /* 画面全体の高さをしっかり確保 */
+      padding: 80px 0 60px 0; /* 上部パディングを80pxに拡大し、アバターが画面外へ見切れるのを防止 */
       box-sizing: border-box;
     }
 
     .jspsych-content-wrapper {
       width: 92%;
       max-width: 640px;
-      /* 上部パディングを3remから5remに増やし、アバターが文章に絶対に被らないように改善 */
+      /* 上部パディングを5remに固定し、アバターと文章の重なりを完全ガード */
       padding: 5rem 1.8rem 2.5rem 1.8rem;
       background: #fffef0; /* 温かみのあるアイボリーのびんせんカラー */
       border: 6px solid #8B5A2B; /* 太めの木製ブラウン境界線 */
@@ -67,8 +68,8 @@
       justify-content: center;
       box-sizing: border-box;
       position: relative;
-      margin-top: 50px; /* アバターの突き抜けを考慮した上部マージンを設定 */
-      margin-bottom: 20px;
+      margin-top: 20px; /* flex-start 化に合わせ、上部を20pxの程よいマージンに調整 */
+      margin-bottom: 40px;
     }
 
     /* 会話吹き出しのぷっくりしたツノを再現 */
@@ -214,26 +215,52 @@
       border: 6px solid #8B5A2B;
       border-radius: 16px;
       background-color: #ffffff;
-      max-width: 100%;
-      height: auto;
+      max-width: 100% !important;
+      height: auto !important;
       box-shadow: 0 6px 0 #6e441f, inset 0 2px 5px rgba(0,0,0,0.1);
+      box-sizing: border-box !important;
+    }
+
+    /* 【最重要】jsPsychが自動生成する大元のラッパー要素すべての幅を強制的に100%にする */
+    #jspsych-canvas-slider-response-wrapper,
+    .jspsych-canvas-slider-response-container {
+      width: 100% !important;
+      max-width: 100% !important;
+      display: flex !important;
+      flex-direction: column !important;
+      align-items: center !important;
+      box-sizing: border-box !important;
+    }
+
+    /* はみ出しを完全に防止するための更なるコンパクトスタイル設定 */
+    .jspsych-sliders-response-container,
+    .jspsych-sliders-response-container * {
+      box-sizing: border-box !important;
     }
 
     .jspsych-sliders-response-container {
-      width: 100% !important;
-      max-width: 440px !important;
-      margin-top: 1.8rem !important;
+      width: 100% !important; 
+      max-width: 240px !important; /* さらに小さく(240px)制限して絶対に枠内に収める */
+      margin-top: 1.5rem !important;
       margin-bottom: 0.5rem !important;
+      margin-left: auto !important; /* 左右中央寄せを完全強制 */
+      margin-right: auto !important; /* 左右中央寄せを完全強制 */
+      padding: 0 5px !important;
+      display: block !important;
     }
 
+    /* スライダー本体の幅をコンテナの100%に強制固定 */
     input[type="range"] {
       -webkit-appearance: none;
-      width: 100%;
+      width: 100% !important;
+      max-width: 100% !important;
       height: 12px;
       background: #d7ccc8; /* 枝のようなブラウンベージュのレール */
       border: 3px solid #8B5A2B;
       border-radius: 10px;
       outline: none;
+      margin: 0 auto !important;
+      display: block !important;
     }
 
     /* スライダーつまみを回転する「葉っぱ」に形状変更 */
@@ -403,7 +430,6 @@
     const participant_info = {
       type: jsPsychHtmlKeyboardResponse,
       stimulus: `
-        <!-- position: relativeを解除し、アバターが吹き出し全体(content-wrapper)基準で左上に配置されるよう修正 -->
         <div class="instructions" style="text-align: center; max-width: 420px; margin: 0 auto;">
           <!-- キャラクターアバター：たぬきち風 -->
           <div class="avatar-container">🦝</div>
@@ -458,7 +484,6 @@
     const instructions = {
       type: jsPsychHtmlButtonResponse,
       stimulus: `
-        <!-- position: relativeを解除し、アバターが吹き出し全体(content-wrapper)基準で左上に配置されるよう修正 -->
         <div class="instructions">
           <!-- キャラクターアバター：しずえ風 -->
           <div class="avatar-container">🐶</div>
@@ -479,7 +504,6 @@
     timeline.push(instructions);
 
     // ==========================================
-    // ミュラー・リヤー錯視の描画を行う共通関数
     // ==========================================
     function drawMullerLyer(canvas, value, config, initial_value) {
       if (!canvas || typeof canvas.getContext !== 'function') {
@@ -559,7 +583,8 @@
     const total_trials = trials_config.length;
 
     trials_config.forEach((config, index) => {
-      const initial_value = Math.floor(Math.random() * (300 - 100 + 1)) + 100;
+      // 最小値(50)と最大値(350)のちょうど「真ん中」である「200」にスライダーの初期値を固定
+      const initial_value = 200;
 
       const trial = {
         type: jsPsychCanvasSliderResponse,
@@ -611,7 +636,6 @@
     const save_data_trial = {
       type: jsPsychHtmlKeyboardResponse,
       stimulus: `
-        <!-- position: relativeを解除し、アバターが吹き出し全体基準で左上に配置されるよう修正 -->
         <div id="save-data-container" class="instructions" style="text-align: center; width: 100%;">
           <!-- キャラクターアバター：フータ風 -->
           <div class="avatar-container">🦉</div>
@@ -700,7 +724,6 @@
         const trials = jsPsych.data.get().filter({task: 'muller_lyer'});
         const s_id = trials.values()[0]?.subject_id || jsPsych.data.get().values()[0]?.subject_id || "不明な島民";
         
-        // position: relativeを解除し、アバターが吹き出し全体基準で左上に配置されるよう修正
         let results_html = `<div class="instructions">`;
         results_html += `<div class="avatar-container">🦉</div>`;
         results_html += `<h1 style="margin-top: 0; padding-left: 15px; padding-right: 15px;">あなたの実験結果</h1>`;
