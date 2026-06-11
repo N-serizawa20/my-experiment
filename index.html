@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N実験室</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background-color: #f0fdf9; /* 薄いミントグリーンの背景 */
+            color: #374151;
+            font-family: 'Helvetica Neue', Arial, 'Hiragino Kaku Gothic ProN', 'Hiragino Sans', Meiryo, sans-serif;
+        }
+        .experiment-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .experiment-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px -5px rgba(16, 185, 129, 0.2);
+        }
+    </style>
+</head>
+<body class="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
+
+    <div class="max-w-3xl mx-auto">
+        <!-- ヘッダー -->
+        <header class="text-center mb-12">
+            <h1 class="text-3xl sm:text-4xl font-bold text-emerald-800 mb-4">
+                N実験室
+            </h1>
+            <div class="h-1 w-20 bg-emerald-500 mx-auto rounded-full"></div>
+        </header>
+
+        <!-- 挨拶文 -->
+        <section class="bg-white rounded-2xl shadow-sm p-8 mb-12 border border-emerald-100">
+            <p class="text-lg text-gray-700 leading-relaxed">
+                ご訪問ありがとうございます。以下の実験へのご協力をお願いいたします。<br>
+                各実験は数分で完了します。スマートフォンからも参加可能です。
+            </p>
+        </section>
+
+        <!-- 実験リスト -->
+        <main class="grid gap-6 md:grid-cols-2">
+            
+            <!-- 実験0 -->
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
+                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験0：はじめてのWebページ</h2>
+                <p class="text-gray-600 mb-6 text-sm">第2回で作成した記念すべき「Hello World」のページです。</p>
+                <a href="hello_world.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
+                    Hello Worldを見る
+                </a>
+            </article>
+
+            <!-- 実験1 -->
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
+                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験1：ストループ課題</h2>
+                <p class="text-gray-600 mb-6 text-sm">「文字の意味」と「文字の色」の干渉を調べる、簡単なキーボード入力のテストです。（所要時間：約3分）</p>
+                <a href="stroop.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
+                    実験1に参加する
+                </a>
+            </article>
+
+            <!-- 実験2 -->
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
+                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験2：ミュラー・リヤー錯視</h2>
+                <p class="text-gray-600 mb-6 text-sm">図形の長さが違って見える錯覚を測る、スライダーを使った視覚のテストです。（所要時間：約2分）</p>
+                <a href="muller_lyer_final.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
+                    実験2に参加する
+                </a>
+            </article>
+
+        </main>
+
+        <footer class="mt-16 text-center text-gray-400 text-sm">
+            &copy; 2026 Shokei Gakuin University Psychology Lab.
+        </footer>
+    </div>
+
+</body>
+</html>
