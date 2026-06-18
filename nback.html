@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>N-Back ワーキングメモリ統合実験 (GAS送信対応)</title>
+  
+  <!-- jsPsych core and styles -->
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
+  
+  <!-- jsPsych plugins (Using correct npm-scoped v7 CDN paths) -->
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-html-form@1.0.3"></script>
+
+  <!-- Tailwind CSS for premium responsive styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <style>
+    /* 全体フォントおよびデザインの統一 */
+    body {
+      font-family: 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      background-color: #f8fafc;
+      color: #1e293b;
+      line-height: 1.8;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent; /* モバイルのタップ青枠を消す */
+    }
+    
+    .jspsych-content {
+      max-width: 800px;
+      width: 95%;
+    }
+
+    /* 教示文のスタイル */
+    .instruction-text {
+      font-size: 1.20rem;
+      text-align: left;
+      margin-bottom: 1.5rem;
+      color: #334155;
+    }
+
+    /* レスポンシブ対応の大きな反応ボタン */
+    .choice-btn {
+      transition: all 0.1s ease;
+      touch-action: manipulation; /* ダブルタップズームの防止 */
+    }
+
+    /* テーブルデザイン */
+    .feedback-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+    }
+    .feedback-table th {
+      background-color: #475569;
+      color: #ffffff;
+      padding: 10px;
+      text-align: center;
+      font-weight: 600;
+    }
+    .feedback-table td {
+      border: 1px solid #cbd5e1;
+      padding: 10px;
+      text-align: center;
+    }
+    .feedback-table tr:nth-child(even) {
+      background-color: #f1f5f9;
+    }
+  </style>
+</head>
+<body>
+  <!-- 実験描画ターゲット -->
+  <div id="jspsych-target"></div>
+
+  <script>
+    // --- GAS接続先設定 (ユーザー指定のGAS Web App URL) ---
+    const GAS_URL = 'https://script.google.com/macros/s/AKfycbzeqvKM9hG1gdgIEBoBhVFzb8AiTfHJULyPLMR-HOG1bHPopVVh-H61inl19Z01UqcR/exec';
+
+    // --- 参加者情報格納用変数 ---
+    let participantInfo = {
+      id: '',
+      age: '',
+      gender: ''
+    };
+
+    // --- アルファベット5文字の定義 ---
+    const letters = ['A', 'B', 'C', 'D', 'E'];
+
+    // ボタンがクリックされた時に、キーボードのFまたはJが押されたようにjsPsychにエミュレートする関数
+    function simulateKeypress(keyCharacter) {
+      const event = new KeyboardEvent('keydown', {
+        key: keyCharacter,
+        code: keyCharacter === 'f' ? 'KeyF' : 'KeyJ',
+        bubbles: true,
+        cancelable: true
+      });
+      document.dispatchEvent(event);
+      
+      // ボタンが押されたときのアクティブアニメーションを視覚的にトリガー
+      const btnId = keyCharacter === 'f' ? 'btn-same-custom' : 'btn-diff-custom';
+      const btn = document.getElementById(btnId);
+      if (btn) {
+        btn.classList.add('translate-y-1', 'border-b-0', 'brightness-90');
+        setTimeout(() => {
+          btn.classList.remove('translate-y-1', 'border-b-0', 'brightness-90');
+        }, 120);
+      }
+    }
+
+    // --- 【1-Back】配列生成ロジック ---
+    // 全20試行。ターゲット（直前と同じ）が「厳密に6回」出現する配列を生成。
+    function generate1BackSequence() {
+      const totalTrials = 20;
+      const targetCount = 6;
+      
+      let trialTypes = [false]; // 最初の1試行目はターゲットにできない
+      let remainingTypes = [];
+      for (let i = 0; i < targetCount; i++) remainingTypes.push(true);
+      for (let i = 0; i < (totalTrials - 1 - targetCount); i++) remainingTypes.push(false);
+      
+      // フィッシャー–イェーツのシャッフル
+      for (let i = remainingTypes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainingTypes[i], remainingTypes[j]] = [remainingTypes[j], remainingTypes[i]];
+      }
+      
+      trialTypes = trialTypes.concat(remainingTypes);
+      let sequence = [];
+      
+      for (let i = 0; i < totalTrials; i++) {
+        if (i === 0) {
+          sequence.push(letters[Math.floor(Math.random() * letters.length)]);
+        } else {
+          const prevLetter = sequence[i - 1];
+          if (trialTypes[i] === true) {
+            sequence.push(prevLetter);
+          } else {
+            const eligibleLetters = letters.filter(l => l !== prevLetter);
+            sequence.push(eligibleLetters[Math.floor(Math.random() * eligibleLetters.length)]);
+          }
+        }
+      }
+      return sequence;
+    }
+
+    // --- 【2-Back】配列生成ロジック ---
+    // 全20試行。ターゲット（2つ前と同じ）が「厳密に6回」出現する配列を生成。
+    function generate2BackSequence() {
+      const totalTrials = 20;
+      const targetCount = 6;
+      
+      let trialTypes = [false, false]; // 最初の2試行目は2つ前がないためターゲットにできない
+      let remainingTypes = [];
+      for (let i = 0; i < targetCount; i++) remainingTypes.push(true);
+      for (let i = 0; i < (totalTrials - 2 - targetCount); i++) remainingTypes.push(false);
+      
+      // シャッフル
+      for (let i = remainingTypes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [remainingTypes[i], remainingTypes[j]] = [remainingTypes[j], remainingTypes[i]];
+      }
+      
+      trialTypes = trialTypes.concat(remainingTypes);
+      let sequence = [];
+      
+      for (let i = 0; i < totalTrials; i++) {
+        if (i === 0) {
+          sequence.push(letters[Math.floor(Math.random() * letters.length)]);
+        } else if (i === 1) {
+          sequence.push(letters[Math.floor(Math.random() * letters.length)]);
+        } else {
+          const targetLetter = sequence[i - 2];
+          if (trialTypes[i] === true) {
+            sequence.push(targetLetter);
+          } else {
+            // 2つ前の文字と異なるものを割り当てる
+            const eligibleLetters = letters.filter(l => l !== targetLetter);
+            sequence.push(eligibleLetters[Math.floor(Math.random() * eligibleLetters.length)]);
+          }
+        }
+      }
+      return sequence;
+    }
+
+    // 両配列をあらかじめ生成
+    const sequence1Back = generate1BackSequence();
+    const sequence2Back = generate2BackSequence();
+
+    // --- jsPsych初期化 ---
+    const jsPsych = initJsPsych({
+      display_element: 'jspsych-target',
+      on_finish: function() {
+        const displayElement = jsPsych.getDisplayElement();
+        
+        // 1. 送信中画面のレンダリング
+        displayElement.innerHTML = `
+          <div class="max-w-md mx-auto my-12 bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-center select-none">
+            <div class="flex justify-center mb-6">
+              <svg class="animate-spin h-12 w-12 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-slate-800 mb-2">データを送信中です...</h2>
+            <p class="text-slate-500 text-sm">しばらくそのままでお待ちください。完了すると結果が表示されます。</p>
+          </div>
+        `;
+
+        // 2. jsPsychが収集したデータから、不要な行を除外し反応測定データ(計40行)のみを抽出
+        const trialsData = jsPsych.data.get().filter({trial_type: 'html-keyboard-response'}).values();
+        const validTrials = trialsData.filter(d => d.trial_index_custom !== undefined);
+
+        // 送信用データ(JSON用)の整形
+        const payload = {
+          participant_id: participantInfo.id,
+          age: participantInfo.age,
+          gender: participantInfo.gender,
+          device_user_agent: navigator.userAgent,
+          experimental_trials: validTrials.map(trial => ({
+            condition: trial.condition,
+            trial_number: trial.trial_index_custom,
+            presented_letter: trial.letter,
+            target_condition: trial.target_condition,
+            user_response: trial.user_answer,
+            is_correct: trial.correct,
+            reaction_time_ms: (trial.rt !== null && trial.user_answer !== '無反応') ? Math.round(trial.rt) : null
+          }))
+        };
+
+        // 3. fetch による POST 送信 (mode: 'no-cors' 指定)
+        fetch(GAS_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(() => {
+          // 送信成功時：完了メッセージとフィードバック画面を表示
+          showFeedbackScreen("実験終了。ご協力ありがとうございました。");
+        })
+        .catch((error) => {
+          console.error("Transmission failed: ", error);
+          // 通信エラー発生時も、結果データ保護のためフィードバック画面を表示
+          showFeedbackScreen("実験終了。ご協力ありがとうございました。（ローカルにデータを保持しています）");
+        });
+      }
+    });
+
+    const timeline = [];
+
+    // --- 1. 参加者情報入力画面 ---
+    const participant_info_trial = {
+      type: jsPsychSurveyHtmlForm,
+      html: `
+        <div class="bg-white p-8 rounded-xl shadow-md max-w-md mx-auto my-6 border border-slate-200 text-left">
+          <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">実験参加登録</h2>
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1" for="participant_id">参加者ID（例：名前のイニシャルなど） <span class="text-red-500">*</span></label>
+              <input type="text" id="participant_id" name="participant_id" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例: HT01">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1" for="age">年齢 <span class="text-red-500">*</span></label>
+              <input type="number" id="age" name="age" required min="1" max="120" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="例: 22">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1" for="gender">性別 <span class="text-red-500">*</span></label>
+              <select id="gender" name="gender" required class="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white">
+                <option value="">選択してください</option>
+                <option value="male">男性</option>
+                <option value="female">女性</option>
+                <option value="other">その他 / 回答しない</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      `,
+      button_label: '実験の説明へ進む',
+      on_finish: function(data) {
+        participantInfo.id = data.response.participant_id;
+        participantInfo.age = data.response.age;
+        participantInfo.gender = data.response.gender;
+
+        jsPsych.data.addProperties({
+          participant_id: participantInfo.id,
+          age: participantInfo.age,
+          gender: participantInfo.gender
+        });
+      }
+    };
+    timeline.push(participant_info_trial);
+
+    // --- 2. 1-Back 教示画面 ---
+    const instructions_1back = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+        <div class="text-left bg-white p-8 rounded-xl shadow-md border border-slate-200">
+          <span class="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-full mb-2 inline-block">前半戦</span>
+          <h2 class="text-2xl font-bold mb-6 text-slate-800">1-Back課題のご説明</h2>
+          <div class="space-y-4 text-slate-700 leading-relaxed instruction-text">
+            <p>画面の中央に、アルファベット（A, B, C, D, E）が1文字ずつ順番に現れます。</p>
+            <p class="bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500">
+              提示されたアルファベットが、<strong>「1つ前のアルファベットと【同じ】か【違う】か」</strong>を素早く判断して答えてください。
+            </p>
+            <div class="mt-4 p-3 bg-slate-100 rounded">
+              <strong class="text-slate-800">【具体例】</strong><br>
+              ・1文字目：<span class="font-bold text-lg text-slate-800">B</span> （※最初の1回目は必ず「違う」を選びます）<br>
+              ・2文字目：<span class="font-bold text-lg text-slate-800">A</span> （1つ前の B と違うので ➔ <span class="text-blue-600 font-bold">違う</span>）<br>
+              ・3文字目：<span class="font-bold text-lg text-slate-800">A</span> （1つ前の A と同じなので ➔ <span class="text-red-600 font-bold">同じ</span>）
+            </div>
+            <div class="mt-6">
+              <strong class="text-slate-800">【操作方法】</strong><br>
+              ・<span class="font-semibold text-slate-800">スマホ・タブレット：</span> 画面下の「同じ」「違う」ボタンを直接タップしてください。<br>
+              ・<span class="font-semibold text-slate-800">パソコン：</span> 画面ボタンをクリックするか、キーボードのキーを押してください。
+              <div class="ml-4 mt-1 text-sm text-slate-600">
+                👉 キーボード：<span class="px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold">F</span> キー ＝ <span class="text-emerald-600 font-bold">同じ</span> ／ <span class="px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold">J</span> キー ＝ <span class="text-rose-600 font-bold">違う</span>
+              </div>
+            </div>
+            <p class="text-sm text-amber-600 font-medium mt-4">※回答しても文字はすぐ切り替わりません。各試行は一定の間隔（2秒）で進みますので、焦らず正確に答えてください。</p>
+          </div>
+        </div>
+      `,
+      choices: ['1-Back 課題を始める'],
+      button_html: '<button class="w-full sm:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-bold text-lg rounded-lg shadow-md transition-all choice-btn mt-4">%choice%</button>'
+    };
+    timeline.push(instructions_1back);
+
+    // --- 3. 1-Back 課題 試行タイムライン ---
+    for (let i = 0; i < sequence1Back.length; i++) {
+      const currentLetter = sequence1Back[i];
+      const isFirstTrial = (i === 0);
+      const prevLetter = isFirstTrial ? null : sequence1Back[i - 1];
+      const isTarget = (!isFirstTrial && currentLetter === prevLetter);
+
+      const trial_1back = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          return `
+            <div class="flex flex-col items-center justify-between min-h-[420px] py-4 select-none">
+              <!-- 操作ガイド（ヘッダー） -->
+              <div class="text-sm sm:text-base text-slate-400 font-medium mb-4 text-center">
+                <span class="px-2 py-0.5 bg-slate-200 text-slate-700 text-xs font-bold rounded-md mr-2">1-Back (1つ前)</span>
+                1つ前と同じ ➔ <span class="text-slate-500 font-bold">同じ (F)</span> ｜ 違う ➔ <span class="text-slate-500 font-bold">違う (J)</span>
+              </div>
+              
+              <!-- メイン刺激（提示文字） -->
+              <div id="stimulus-container" class="flex items-center justify-center h-48">
+                <span id="stimulus-letter" class="text-8xl font-extrabold text-slate-800 tracking-wider transition-opacity duration-200">
+                  ${currentLetter}
+                </span>
+              </div>
+              
+              <!-- タッチ対応の大きなボタン -->
+              <div class="flex justify-center gap-6 w-full max-w-md mx-auto mt-6">
+                <button id="btn-same-custom" onclick="simulateKeypress('f')" type="button" class="choice-btn w-1/2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xl rounded-2xl shadow-lg border-b-4 border-emerald-800 focus:outline-none">
+                  同じ
+                  <span class="hidden md:block text-xs font-normal opacity-75 mt-1">[ F キー ]</span>
+                </button>
+                <button id="btn-diff-custom" onclick="simulateKeypress('j')" type="button" class="choice-btn w-1/2 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xl rounded-2xl shadow-lg border-b-4 border-rose-800 focus:outline-none">
+                  違う
+                  <span class="hidden md:block text-xs font-normal opacity-75 mt-1">[ J キー ]</span>
+                </button>
+              </div>
+
+              <!-- 進行状況 -->
+              <div class="text-xs text-slate-400 mt-4">
+                1-Back 課題: 試行 ${i + 1} / 20
+              </div>
+            </div>
+          `;
+        },
+        choices: ['f', 'j'],
+        on_load: function() {
+          // 500ms経過後に文字を非表示（透明化）にする
+          setTimeout(() => {
+            const letterEl = document.getElementById('stimulus-letter');
+            if (letterEl) {
+              letterEl.style.opacity = '0';
+            }
+          }, 500);
+        },
+        trial_duration: 2000, 
+        response_ends_trial: false, 
+        on_finish: function(data) {
+          let correct = false;
+          let userAnswerString = '無反応';
+
+          if (data.response !== null) {
+            const pressedKey = data.response.toLowerCase();
+            const answeredSame = (pressedKey === 'f');
+            userAnswerString = answeredSame ? '同じ' : '違う';
+            
+            if (isFirstTrial) {
+              correct = (!answeredSame); // 最初の試行は「違う」が正解
+            } else {
+              correct = (answeredSame === isTarget);
+            }
+          }
+
+          // 1-Back用のデータを記録
+          data.condition = '1-back';
+          data.trial_index_custom = i + 1;
+          data.letter = currentLetter;
+          data.target_condition = isFirstTrial ? '非ターゲット(最初の試行)' : (isTarget ? '同じ(Target)' : '違う(Non-Target)');
+          data.user_answer = userAnswerString;
+          data.correct = correct;
+        }
+      };
+      timeline.push(trial_1back);
+    }
+
+    // --- 4. 休憩 & 2-Back 教示画面 ---
+    const instructions_2back = {
+      type: jsPsychHtmlButtonResponse,
+      stimulus: `
+        <div class="text-left bg-white p-8 rounded-xl shadow-md border border-slate-200">
+          <div class="flex justify-between items-center mb-6">
+            <span class="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-full">後半戦</span>
+            <span class="text-xs text-emerald-600 font-bold bg-emerald-50 px-2 py-1 rounded">前半 (1-Back) 終了です！</span>
+          </div>
+          <h2 class="text-2xl font-bold mb-4 text-slate-800">少し休んでください（後半：2-Back課題）</h2>
+          
+          <div class="space-y-4 text-slate-700 leading-relaxed instruction-text">
+            <p class="font-semibold text-rose-600">⚠️ ここからルールが変わります！</p>
+            <p>提示されたアルファベットが、<strong>「【2つ前】のアルファベットと【同じ】か【違う】か」</strong>を素早く判断して答えてください。</p>
+            
+            <p class="bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500">
+              これからは、1つ前ではなく「2つ前に表示された文字」と記憶を照合します。
+            </p>
+
+            <div class="mt-4 p-3 bg-slate-100 rounded">
+              <strong class="text-slate-800">【2-Backの具体例】</strong><br>
+              ・1文字目：<span class="font-bold text-lg text-slate-800">A</span> （※最初は必ず「違う」）<br>
+              ・2文字目：<span class="font-bold text-lg text-slate-800">B</span> （※2つ前がないので必ず「違う」）<br>
+              ・3文字目：<span class="font-bold text-lg text-slate-800">A</span> （2つ前の <span class="font-bold text-indigo-600 text-lg">A</span> と同じなので ➔ <span class="text-red-600 font-bold">同じ</span>）<br>
+              ・4文字目：<span class="font-bold text-lg text-slate-800">C</span> （2つ前の <span class="font-bold text-slate-600 text-lg">B</span> と違うので ➔ <span class="text-blue-600 font-bold">違う</span>）
+            </div>
+
+            <div class="mt-6 text-sm text-slate-600">
+              👉 キーボード操作は共通です：<span class="px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold">F</span> キー ＝ <span class="text-emerald-600 font-bold">同じ</span> ／ <span class="px-2 py-1 bg-white border border-slate-300 rounded font-mono font-bold">J</span> キー ＝ <span class="text-rose-600 font-bold">違う</span>
+            </div>
+            <p class="text-sm text-amber-600 font-medium mt-4">準備ができたら、下のボタンを押して後半戦をスタートしましょう。</p>
+          </div>
+        </div>
+      `,
+      choices: ['2-Back 課題を始める'],
+      button_html: '<button class="w-full sm:w-auto px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-lg shadow-md transition-all choice-btn mt-4">%choice%</button>'
+    };
+    timeline.push(instructions_2back);
+
+    // --- 5. 2-Back 課題 試行タイムライン ---
+    for (let i = 0; i < sequence2Back.length; i++) {
+      const currentLetter = sequence2Back[i];
+      const isFirstTwo = (i < 2);
+      const prevTwoLetter = isFirstTwo ? null : sequence2Back[i - 2];
+      const isTarget = (!isFirstTwo && currentLetter === prevTwoLetter);
+
+      const trial_2back = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          return `
+            <div class="flex flex-col items-center justify-between min-h-[420px] py-4 select-none">
+              <!-- 操作ガイド（ヘッダー） -->
+              <div class="text-sm sm:text-base text-slate-400 font-medium mb-4 text-center">
+                <span class="px-2 py-0.5 bg-indigo-200 text-indigo-700 text-xs font-bold rounded-md mr-2">2-Back (2つ前)</span>
+                2つ前と同じ ➔ <span class="text-slate-500 font-bold">同じ (F)</span> ｜ 違う ➔ <span class="text-slate-500 font-bold">違う (J)</span>
+              </div>
+              
+              <!-- メイン刺激（提示文字） -->
+              <div id="stimulus-container" class="flex items-center justify-center h-48">
+                <span id="stimulus-letter" class="text-8xl font-extrabold text-slate-800 tracking-wider transition-opacity duration-200">
+                  ${currentLetter}
+                </span>
+              </div>
+              
+              <!-- タッチ対応の大きなボタン -->
+              <div class="flex justify-center gap-6 w-full max-w-md mx-auto mt-6">
+                <button id="btn-same-custom" onclick="simulateKeypress('f')" type="button" class="choice-btn w-1/2 py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xl rounded-2xl shadow-lg border-b-4 border-emerald-800 focus:outline-none">
+                  同じ
+                  <span class="hidden md:block text-xs font-normal opacity-75 mt-1">[ F キー ]</span>
+                </button>
+                <button id="btn-diff-custom" onclick="simulateKeypress('j')" type="button" class="choice-btn w-1/2 py-4 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xl rounded-2xl shadow-lg border-b-4 border-rose-800 focus:outline-none">
+                  違う
+                  <span class="hidden md:block text-xs font-normal opacity-75 mt-1">[ J キー ]</span>
+                </button>
+              </div>
+
+              <!-- 進行状況 -->
+              <div class="text-xs text-slate-400 mt-4">
+                2-Back 課題: 試行 ${i + 1} / 20
+              </div>
+            </div>
+          `;
+        },
+        choices: ['f', 'j'],
+        on_load: function() {
+          // 500ms経過後に文字を非表示（透明化）にする
+          setTimeout(() => {
+            const letterEl = document.getElementById('stimulus-letter');
+            if (letterEl) {
+              letterEl.style.opacity = '0';
+            }
+          }, 500);
+        },
+        trial_duration: 2000, 
+        response_ends_trial: false, 
+        on_finish: function(data) {
+          let correct = false;
+          let userAnswerString = '無反応';
+
+          if (data.response !== null) {
+            const pressedKey = data.response.toLowerCase();
+            const answeredSame = (pressedKey === 'f');
+            userAnswerString = answeredSame ? '同じ' : '違う';
+            
+            if (isFirstTwo) {
+              correct = (!answeredSame); // 最初の2試行は「違う」が正解
+            } else {
+              correct = (answeredSame === isTarget);
+            }
+          }
+
+          // 2-Back用のデータを記録
+          data.condition = '2-back';
+          data.trial_index_custom = i + 1;
+          data.letter = currentLetter;
+          data.target_condition = isFirstTwo ? '非ターゲット(判定不能な試行)' : (isTarget ? '同じ(Target)' : '違う(Non-Target)');
+          data.user_answer = userAnswerString;
+          data.correct = correct;
+        }
+      };
+      timeline.push(trial_2back);
+    }
+
+    // --- 6. 最終的な統合データ表フィードバック画面表示処理 ---
+    function showFeedbackScreen(completionMessage) {
+      const displayElement = jsPsych.getDisplayElement();
+
+      // jsPsychが収集したデータを抽出
+      const trialsData = jsPsych.data.get().filter({trial_type: 'html-keyboard-response'}).values();
+      const validTrials = trialsData.filter(d => d.trial_index_custom !== undefined);
+
+      // --- 条件別集計 ---
+      const oneBackTrials = validTrials.filter(d => d.condition === '1-back');
+      const twoBackTrials = validTrials.filter(d => d.condition === '2-back');
+
+      // 1-Back集計
+      const oneBackCorrect = oneBackTrials.filter(d => d.correct).length;
+      const oneBackAccuracy = oneBackTrials.length > 0 ? ((oneBackCorrect / oneBackTrials.length) * 100).toFixed(1) : '0';
+      const oneBackResponded = oneBackTrials.filter(d => d.rt !== null && d.user_answer !== '無反応');
+      const oneBackAvgRt = oneBackResponded.length > 0 ? (oneBackResponded.reduce((sum, d) => sum + d.rt, 0) / oneBackResponded.length).toFixed(1) : '0';
+
+      // 2-Back集計
+      const twoBackCorrect = twoBackTrials.filter(d => d.correct).length;
+      const twoBackAccuracy = twoBackTrials.length > 0 ? ((twoBackCorrect / twoBackTrials.length) * 100).toFixed(1) : '0';
+      const twoBackResponded = twoBackTrials.filter(d => d.rt !== null && d.user_answer !== '無反応');
+      const twoBackAvgRt = twoBackResponded.length > 0 ? (twoBackResponded.reduce((sum, d) => sum + d.rt, 0) / twoBackResponded.length).toFixed(1) : '0';
+
+      // HTMLコンテンツの構築
+      let html = `
+        <div class="max-w-4xl mx-auto my-8 bg-white p-6 sm:p-8 rounded-2xl shadow-xl border border-slate-200">
+          
+          <!-- 送信完了アナウンス -->
+          <div class="mb-6 p-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center justify-center gap-2 shadow-sm font-semibold text-base sm:text-lg">
+            <svg class="h-6 w-6 text-emerald-600 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <span>${completionMessage}</span>
+          </div>
+
+          <h2 class="text-3xl font-black text-center text-slate-800 mb-6">全実験完了フィードバック</h2>
+          
+          <!-- 参加者情報要約 -->
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 bg-slate-50 p-4 rounded-xl border border-slate-200">
+            <div><span class="text-slate-500 font-semibold text-sm">参加者ID:</span> <span class="font-bold text-slate-800">${participantInfo.id}</span></div>
+            <div><span class="text-slate-500 font-semibold text-sm">年齢:</span> <span class="font-bold text-slate-800">${participantInfo.age} 歳</span></div>
+            <div><span class="text-slate-500 font-semibold text-sm">性別:</span> <span class="font-bold text-slate-800">${participantInfo.gender === 'male' ? '男性' : participantInfo.gender === 'female' ? '女性' : 'その他'}</span></div>
+          </div>
+
+          <!-- 成績ダイジェスト (左右比較) -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            <!-- 1-Back結果 -->
+            <div class="bg-blue-50 border border-blue-200 rounded-2xl p-6">
+              <h3 class="text-lg font-bold text-blue-800 text-center border-b border-blue-200 pb-2 mb-4">前半：1-Back 課題</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="text-center">
+                  <span class="text-xs font-bold text-blue-600 uppercase">正答率</span>
+                  <div class="text-2xl font-black text-blue-900 mt-1">${oneBackAccuracy}%</div>
+                  <span class="text-[10px] text-blue-500">(${oneBackCorrect} / ${oneBackTrials.length})</span>
+                </div>
+                <div class="text-center">
+                  <span class="text-xs font-bold text-blue-600 uppercase">平均反応時間</span>
+                  <div class="text-2xl font-black text-blue-900 mt-1">${oneBackAvgRt} <span class="text-sm">ms</span></div>
+                  <span class="text-[10px] text-blue-500">(未反応・最初を除く)</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 2-Back結果 -->
+            <div class="bg-indigo-50 border border-indigo-200 rounded-2xl p-6">
+              <h3 class="text-lg font-bold text-indigo-800 text-center border-b border-indigo-200 pb-2 mb-4">後半：2-Back 課題</h3>
+              <div class="grid grid-cols-2 gap-4">
+                <div class="text-center">
+                  <span class="text-xs font-bold text-indigo-600 uppercase">正答率</span>
+                  <div class="text-2xl font-black text-indigo-900 mt-1">${twoBackAccuracy}%</div>
+                  <span class="text-[10px] text-indigo-500">(${twoBackCorrect} / ${twoBackTrials.length})</span>
+                </div>
+                <div class="text-center">
+                  <span class="text-xs font-bold text-indigo-600 uppercase">平均反応時間</span>
+                  <div class="text-2xl font-black text-indigo-900 mt-1">${twoBackAvgRt} <span class="text-sm">ms</span></div>
+                  <span class="text-[10px] text-indigo-500">(未反応・最初除く)</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 詳細データテーブル -->
+          <h3 class="text-lg font-bold text-slate-800 mb-3 border-b-2 border-slate-200 pb-1">全試行（計40試行）詳細ログ</h3>
+          <div class="overflow-y-auto max-h-[480px] rounded-lg border border-slate-200">
+            <table class="feedback-table">
+              <thead class="sticky top-0 shadow-sm z-10">
+                <tr>
+                  <th>条件</th>
+                  <th>試行</th>
+                  <th>提示文字</th>
+                  <th>ターゲット条件</th>
+                  <th>あなたの回答</th>
+                  <th>正誤</th>
+                  <th>反応時間 (ms)</th>
+                </tr>
+              </thead>
+              <tbody>
+      `;
+
+      validTrials.forEach((trial) => {
+        const condBadge = trial.condition === '1-back' 
+          ? '<span class="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-bold rounded-md">1-Back</span>' 
+          : '<span class="px-2 py-1 bg-indigo-100 text-indigo-800 text-xs font-bold rounded-md">2-Back</span>';
+
+        const correctBadge = trial.correct 
+          ? '<span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-full">○ 正解</span>' 
+          : '<span class="px-2 py-0.5 bg-rose-100 text-rose-800 text-xs font-bold rounded-full">× 不正解</span>';
+        
+        const rtDisplay = (trial.rt !== null && trial.user_answer !== '無反応') 
+          ? `${Math.round(trial.rt)}` 
+          : '<span class="text-slate-400">-</span>';
+
+        const conditionStyle = trial.target_condition.includes('Target') 
+          ? 'font-semibold text-violet-600 bg-violet-50/50' 
+          : 'text-slate-500';
+
+        html += `
+          <tr class="hover:bg-slate-50/70 transition-colors">
+            <td>${condBadge}</td>
+            <td class="font-bold text-slate-600">${trial.trial_index_custom}</td>
+            <td class="text-lg font-bold text-slate-800">${trial.letter}</td>
+            <td class="${conditionStyle}">${trial.target_condition}</td>
+            <td class="font-medium">${trial.user_answer}</td>
+            <td>${correctBadge}</td>
+            <td class="font-mono">${rtDisplay}</td>
+          </tr>
+        `;
+      });
+
+      html += `
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-8 text-center flex justify-center gap-4">
+            <button onclick="window.location.reload();" class="px-6 py-3 bg-slate-700 hover:bg-slate-800 text-white font-bold rounded-lg shadow transition-all duration-150">
+              もう一度テストを行う
+            </button>
+          </div>
+        </div>
+      `;
+
+      displayElement.innerHTML = html;
+    }
+
+    // --- 実験の開始 ---
+    jsPsych.run(timeline);
+  </script>
+</body>
+</html>
