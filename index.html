@@ -43,27 +43,60 @@
         <main class="grid gap-6 md:grid-cols-2">
             
             <!-- 実験0 -->
-            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
-                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験0：はじめてのWebページ</h2>
-                <p class="text-gray-600 mb-6 text-sm">第2回で作成した記念すべき「Hello World」のページです。</p>
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験0：はじめてのWebページ</h2>
+                    <p class="text-gray-600 mb-6 text-sm">第2回で作成した記念すべき「Hello World」のページです。</p>
+                </div>
                 <a href="hello_world.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
                     Hello Worldを見る
                 </a>
             </article>
 
-            <!-- 実験1 -->
-            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
-                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験1：ストループ課題</h2>
-                <p class="text-gray-600 mb-6 text-sm">「文字の意味」と「文字の色」の干渉を調べる、簡単なキーボード入力のテストです。（所要時間：約3分）</p>
-                <a href="stroop.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
-                    実験1に参加する
-                </a>
+            <!-- 実験1（本番用実験：事前登録リンク追加） -->
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-100 flex flex-col justify-between">
+                <div>
+                    <div class="flex items-center justify-between mb-2">
+                        <h2 class="text-xl font-semibold text-emerald-900">実験1：ストループ課題</h2>
+                        <span class="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-medium">本番用</span>
+                    </div>
+                    <p class="text-gray-600 mb-6 text-sm">「文字の意味」と「文字の色」の干渉を調べる、簡単なキーボード入力のテストです。（所要時間：約3分）</p>
+                </div>
+                
+                <div class="space-y-3">
+                    <!-- メインアクション：実験参加 -->
+                    <a href="stroop.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-semibold shadow-sm">
+                        実験1に参加する
+                    </a>
+                    
+                    <!-- サブセクション：オープンサイエンス・事前登録（プレレジストレーション） -->
+                    <div class="pt-3 border-t border-gray-100">
+                        <p class="text-xs text-gray-400 mb-2 font-medium flex items-center gap-1">
+                            <svg class="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                            研究の透明性（プレレジストレーション）
+                        </p>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <!-- プレレジ本文へのリンク -->
+                            <a href="https://github.com/N-serizawa20/my-experiment/blob/main/preregistration.md" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center border border-emerald-200 text-emerald-700 bg-emerald-50/30 py-2 px-1 rounded hover:bg-emerald-50 hover:text-emerald-800 transition text-center font-medium">
+                                📄 プレレジを確認
+                            </a>
+                            <!-- 変更履歴（タイムスタンプ）へのリンク -->
+                            <a href="https://github.com/N-serizawa20/my-experiment/commits/main/preregistration.md" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center border border-gray-200 text-gray-500 bg-gray-50/50 py-2 px-1 rounded hover:bg-gray-100 hover:text-gray-700 transition text-center font-medium">
+                                ⏱ 変更履歴を確認
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </article>
 
             <!-- 実験2 -->
-            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50">
-                <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験2：ミュラー・リヤー錯視</h2>
-                <p class="text-gray-600 mb-6 text-sm">図形の長さが違って見える錯覚を測る、スライダーを使った視覚のテストです。（所要時間：約2分）</p>
+            <article class="experiment-card bg-white p-6 rounded-2xl shadow-md border border-emerald-50 flex flex-col justify-between">
+                <div>
+                    <h2 class="text-xl font-semibold text-emerald-900 mb-2">実験2：ミュラー・リヤー錯視</h2>
+                    <p class="text-gray-600 mb-6 text-sm">図形の長さが違って見える錯覚を測る、スライダーを使った視覚のテストです。（所要時間：約2分）</p>
+                </div>
                 <a href="muller_lyer_final.html" class="inline-block w-full text-center bg-emerald-600 text-white py-3 px-4 rounded-lg hover:bg-emerald-700 transition font-medium">
                     実験2に参加する
                 </a>
